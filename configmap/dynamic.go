@@ -165,17 +165,17 @@ func (d *dynamicConfigInternal) loadAndTryFixConfig() (map[string]string, error)
 		}
 		return createdConfigMap.Data, err
 	}
-	data := d.updateConfigMap(configMapsClient, controllerConfig)
+	data := d.updateConfigMapWithDefaultsFromTemplate(configMapsClient, controllerConfig)
 	return data, nil
 }
 
-func (d *dynamicConfigInternal) updateConfigMap(configMapsClient v1.ConfigMapInterface,
-	stored *corev1.ConfigMap) map[string]string {
+func (d *dynamicConfigInternal) updateConfigMapWithDefaultsFromTemplate(configMapsClient v1.ConfigMapInterface,
+	latestUpdate *corev1.ConfigMap) map[string]string {
 	if d.options.Template == nil {
-		return stored.Data
+		return latestUpdate.Data
 	}
 	merged := map[string]string{}
-	for key, value := range stored.Data {
+	for key, value := range latestUpdate.Data {
 		if d.options.RemoveUnknownProperties {
 			if _, ok := d.options.Template[key]; ok {
 				merged[key] = value
@@ -185,18 +185,18 @@ func (d *dynamicConfigInternal) updateConfigMap(configMapsClient v1.ConfigMapInt
 		}
 	}
 	for key, value := range d.options.Template {
-		if _, ok := stored.Data[key]; !ok {
+		if _, ok := latestUpdate.Data[key]; !ok {
 			merged[key] = value
 		}
 	}
 
-	stored.Data = merged
-	updated, err := configMapsClient.Update(context.TODO(), stored, metaV1.UpdateOptions{})
+	latestUpdate.Data = merged
+	updated, err := configMapsClient.Update(context.TODO(), latestUpdate, metaV1.UpdateOptions{})
 	if err != nil {
 		if d.options.OnErrorCallback != nil {
 			d.options.OnErrorCallback(err, nil)
 		}
-		return stored.Data
+		return latestUpdate.Data
 	}
 
 	return updated.Data
